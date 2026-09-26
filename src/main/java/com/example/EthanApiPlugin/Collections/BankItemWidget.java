@@ -41,6 +41,16 @@ public class BankItemWidget implements Widget {
     }
 
     @Override
+    public String[][] getSubOps() {
+        return null;
+    }
+
+    @Override
+    public void setSubOp(int index, int subop, String option) {
+        // Synthetic item widgets do not own menu suboptions.
+    }
+
+    @Override
     public void clearActions(){};
 
     @Override

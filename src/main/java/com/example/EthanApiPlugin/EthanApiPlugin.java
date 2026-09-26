@@ -49,8 +49,6 @@ public class EthanApiPlugin extends Plugin {
     static PluginManager pluginManager = RuneLite.getInjector().getInstance(PluginManager.class);
     static ItemManager itemManager = RuneLite.getInjector().getInstance(ItemManager.class);
     static Method doAction = null;
-    static String animationField = null;
-    static long animationMult;
     static final HashSet<WorldPoint> EMPTY_SET = new HashSet<>();
     public static final int[][] directionsMap = {
             {-2, 0},
@@ -121,51 +119,7 @@ public class EthanApiPlugin extends Plugin {
 
     @SneakyThrows
     public static int getAnimation(NPC npc) {
-        if (npc == null) {
-            return -1;
-        }
-        if(animationField ==null|| animationMult ==0){
-            Field[] fields = Arrays.stream(npc.getClass().getSuperclass().getDeclaredFields()).filter(x->x.getType()==int.class&&!Modifier.isFinal(x.getModifiers())&&!Modifier.isStatic(x.getModifiers())).toArray(Field[]::new);
-            boolean[] changed = new boolean[fields.length];
-            int[] values = new int[fields.length];
-            for (int i = 0; i < fields.length; i++) {
-                fields[i].setAccessible(true);
-                values[i] = fields[i].getInt(npc);
-                changed[i] = false;
-            }
-            Random rand = new Random();
-            for (int i = 0; i < 5; i++) {
-                npc.setAnimation(rand.nextInt(Integer.MAX_VALUE));
-                for (int i1 = 0; i1 < values.length; i1++) {
-                    if(values[i1]!=fields[i1].getInt(npc)){
-                        changed[i1] = true;
-                    }
-                }
-            }
-            int animationFieldIndex = -1;
-            for (int i = 0; i < changed.length; i++) {
-                if(changed[i]){
-                    if(animationFieldIndex!=-1){
-                        System.out.println("too many changed");
-                        return -1;
-                    }
-                    animationFieldIndex = i;
-                }
-            }
-            String fieldName = fields[animationFieldIndex].getName();
-            fields[animationFieldIndex].setInt(npc,1);
-            long multiplier = npc.getAnimation();
-            for (Field field : fields) {
-                field.setAccessible(false);
-            }
-            animationField = fieldName;
-            animationMult = multiplier;
-        }
-        Field animation = npc.getClass().getSuperclass().getDeclaredField(animationField);
-        animation.setAccessible(true);
-        int anim = (int) (animation.getInt(npc) * animationMult);
-        animation.setAccessible(false);
-        return anim;
+        return npc == null ? -1 : npc.getAnimation();
     }
 
     public static HeadIcon headIconThruLengthEightArrays(NPC npc) throws IllegalAccessException {
@@ -456,33 +410,18 @@ public class EthanApiPlugin extends Plugin {
     public static void invoke(int var0, int var1, int var2, int var3, int var4, int var5, String var6, String var7, int var8,
                               int var9) {
         if (doAction == null) {
-            Class<?> qtClass = null;
-            Field classes = ClassLoader.class.getDeclaredField("classes");
-            classes.setAccessible(true);
-            ClassLoader classLoader = client.getClass().getClassLoader();
-            Vector<Class<?>> classesVector = (Vector<Class<?>>) classes.get(classLoader);
-
-            for (Class<?> clazz : classesVector) {
-                if (clazz.getName().equals(ObfuscatedNames.doActionClassName)) {
-                    qtClass = clazz;
-                    break;
-                }
-            }
-
-            if (qtClass != null) {
-                try {
-                    doAction = qtClass.getDeclaredMethod(ObfuscatedNames.doActionMethodName, int.class, int.class, int.class, int.class, int.class, int.class, String.class, String.class, int.class, int.class);
-                } catch (NoSuchMethodException ignored) {
-                }
-            } else {
-                System.out.println("Cant find doAction");
-                return;
-            }
+            Class<?> owner = client.getClass().getClassLoader().loadClass(ObfuscatedNames.doActionClassName);
+            doAction = owner.getDeclaredMethod(ObfuscatedNames.doActionMethodName,
+                    int.class, int.class, int.class, int.class, int.class, int.class,
+                    String.class, String.class, int.class, int.class, byte.class);
         }
-
         doAction.setAccessible(true);
-        doAction.invoke(null, var0, var1, var2, var3, var4, var5, var6, var7, var8, var9, -886112733);
-        doAction.setAccessible(false);
+        try {
+            doAction.invoke(null, var0, var1, var2, var3, var4, var5, var6, var7, var8, var9,
+                    ObfuscatedNames.doActionGarbageValue);
+        } finally {
+            doAction.setAccessible(false);
+        }
     }
 
     @Deprecated

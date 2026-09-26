@@ -12,29 +12,20 @@ repositories {
     jcenter()
 }
 
-def runeLiteVersion = '1.12.17-SNAPSHOT'
+def runeLiteVersion = '1.12.39'
 
 dependencies {
     compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
     compileOnly 'org.projectlombok:lombok:1.18.20'
     annotationProcessor 'org.projectlombok:lombok:1.18.20'
     testImplementation 'junit:junit:4.12'
+    testImplementation 'org.ow2.asm:asm-tree:9.7.1'
     testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
     testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
     implementation 'org.json:json:20230227'
     implementation 'org.roaringbitmap:RoaringBitmap:0.9.44'
     implementation("org.benf:cfr:0.152")
 }
-sourceSets {
-    main {
-
-        java {
-            srcDir "src"
-        }
-
-    }
-}
-
 group = 'com.example'
 version = '5.4'
 sourceCompatibility = "11"

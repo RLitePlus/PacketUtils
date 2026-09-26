@@ -9,9 +9,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class PacketReflection {
@@ -32,7 +30,8 @@ public class PacketReflection {
     }
     public static Method getGetPacketBufferNode(){
         try {
-            return Arrays.stream(getClassWithGetPacketBufferNode().getDeclaredMethods()).filter(m -> m.getReturnType().equals(getPacketBufferNodeClass())).collect(Collectors.toList()).get(0);
+            return getClassWithGetPacketBufferNode().getDeclaredMethod(
+                    ObfuscatedNames.getPacketBufferNodeMethodName, getClientPacketClass(), getIsaacClass(), byte.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -50,16 +49,7 @@ public class PacketReflection {
         return null;
     }
     public static Class getPacketWriterClass(){
-        try {
-            Field packetWriterField = getPacketWriterField();
-            packetWriterField.setAccessible(true);
-            Class packetWriterClass = packetWriterField.get(null).getClass();
-            packetWriterField.setAccessible(false);
-            return packetWriterClass;
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        }
-        return null;
+        return loadClassFromClientClassLoader(ObfuscatedNames.packetWriterClassName);
     }
     public static Object getIsaacObject(){
         try {
@@ -94,6 +84,16 @@ public class PacketReflection {
 
 
     public static void sendPacket(PacketDef def, Object... objects) {
+        List<String> parameterNames = parametersFor(def.type);
+        if (parameterNames == null || objects.length != parameterNames.size()
+                || def.writeData.length != def.writeMethods.length) {
+            throw new IllegalArgumentException("Invalid arguments or write count for " + def.type);
+        }
+        for (String field : def.writeData) {
+            if (!parameterNames.contains(field)) {
+                throw new IllegalArgumentException("Unknown " + def.type + " field: " + field);
+            }
+        }
         Object packetBufferNode = null;
         Method getPacketBufferNode = getGetPacketBufferNode();
         Class ClientPacket = getClientPacketClass();
@@ -132,67 +132,7 @@ public class PacketReflection {
             e.printStackTrace();
         }
         getPacketBufferNode.setAccessible(false);
-        List<String> params = null;
-        if (def.type == PacketType.SET_HEADING) {
-            params = List.of("direction");
-        }
-        if (def.type == PacketType.RESUME_NAMEDIALOG || def.type == PacketType.RESUME_STRINGDIALOG) {
-            params = List.of("length", "string");
-        }
-        if (def.type == PacketType.OPHELDD) {
-            params = List.of("selectedId", "selectedChildIndex", "selectedItemId", "destId", "destChildIndex", "destItemId");
-        }
-        if (def.type == PacketType.RESUME_COUNTDIALOG || def.type == PacketType.RESUME_OBJDIALOG) {
-            params = List.of("var0");
-        }
-        if (def.type == PacketType.RESUME_PAUSEBUTTON) {
-            params = List.of("var0", "var1");
-        }
-        if (def.type == PacketType.IF_BUTTON) {
-            params = List.of("widgetId", "slot", "itemId");
-        }
-        if (def.type == PacketType.IF_SUBOP) {
-            params = List.of("widgetId", "slot", "itemId", "menuIndex", "subActionIndex");
-        }
-        if (def.type == PacketType.IF_BUTTONX) {
-            params = List.of("widgetId", "slot", "itemId", "opCode");
-        }
-        if (def.type == PacketType.OPLOC) {
-            params = List.of("objectId", "worldPointX", "worldPointY", "ctrlDown", "subop");
-        }
-        if (def.type == PacketType.OPNPC) {
-            params = List.of("npcIndex", "ctrlDown", "subop");
-        }
-        if (def.type == PacketType.OPPLAYER) {
-            params = List.of("playerIndex", "ctrlDown");
-        }
-        if (def.type == PacketType.OPOBJ) {
-            params = List.of("objectId", "worldPointX", "worldPointY", "ctrlDown", "subop");
-        }
-        if (def.type == PacketType.OPOBJT) {
-            params = List.of("objectId", "worldPointX", "worldPointY", "slot", "itemId", "widgetId",
-                    "ctrlDown");
-        }
-        if (def.type == PacketType.EVENT_MOUSE_CLICK) {
-            params = List.of("mouseInfo", "mouseX", "mouseY", "0");
-        }
-        if (def.type == PacketType.MOVE_GAMECLICK) {
-            params = List.of("worldPointX", "worldPointY", "ctrlDown", "5");
-        }
-        if (def.type == PacketType.IF_BUTTONT) {
-            params = List.of("sourceWidgetId", "sourceSlot", "sourceItemId", "destinationWidgetId",
-                    "destinationSlot", "destinationItemId");
-        }
-        if (def.type == PacketType.OPLOCT) {
-            params = List.of("objectId", "worldPointX", "worldPointY", "slot", "itemId", "widgetId",
-                    "ctrlDown");
-        }
-        if (def.type == PacketType.OPPLAYERT) {
-            params = List.of("playerIndex", "itemId", "slot", "widgetId", "ctrlDown");
-        }
-        if (def.type == PacketType.OPNPCT) {
-            params = List.of("npcIndex", "itemId", "slot", "widgetId", "ctrlDown");
-        }
+        List<String> params = parametersFor(def.type);
         if (params != null) {
             for (int i = 0; i < def.writeData.length; i++) {
                 int index = params.indexOf(def.writeData[i]);
@@ -221,6 +161,71 @@ public class PacketReflection {
             }
             PACKETWRITER.setAccessible(false);
         }
+    }
+
+    static List<String> parametersFor(PacketType type) {
+        List<String> params = null;
+        if (type == PacketType.SET_HEADING) {
+            params = List.of("orientation");
+        }
+        if (type == PacketType.RESUME_NAMEDIALOG || type == PacketType.RESUME_STRINGDIALOG) {
+            params = List.of("length", "string");
+        }
+        if (type == PacketType.OPHELDD) {
+            params = List.of("selectedId", "selectedChildIndex", "selectedItemId", "destId", "destChildIndex", "destItemId");
+        }
+        if (type == PacketType.RESUME_COUNTDIALOG || type == PacketType.RESUME_OBJDIALOG) {
+            params = List.of("var0");
+        }
+        if (type == PacketType.RESUME_PAUSEBUTTON) {
+            params = List.of("var0", "var1");
+        }
+        if (type == PacketType.IF_BUTTON) {
+            params = List.of("widgetId", "slot", "itemId");
+        }
+        if (type == PacketType.IF_SUBOP) {
+            params = List.of("widgetId", "slot", "itemId", "menuIndex", "subActionIndex");
+        }
+        if (type == PacketType.IF_BUTTONX) {
+            params = List.of("widgetId", "slot", "itemId", "opCode");
+        }
+        if (type == PacketType.OPLOC) {
+            params = List.of("objectId", "worldPointX", "worldPointY", "ctrlDown", "subop");
+        }
+        if (type == PacketType.OPNPC) {
+            params = List.of("npcIndex", "ctrlDown", "subop");
+        }
+        if (type == PacketType.OPPLAYER) {
+            params = List.of("playerIndex", "ctrlDown");
+        }
+        if (type == PacketType.OPOBJ) {
+            params = List.of("objectId", "worldPointX", "worldPointY", "ctrlDown", "subop");
+        }
+        if (type == PacketType.OPOBJT) {
+            params = List.of("objectId", "worldPointX", "worldPointY", "slot", "itemId", "widgetId",
+                    "ctrlDown");
+        }
+        if (type == PacketType.EVENT_MOUSE_CLICK) {
+            params = List.of("mouseInfo", "mouseX", "mouseY", "0");
+        }
+        if (type == PacketType.MOVE_GAMECLICK) {
+            params = List.of("worldPointX", "worldPointY", "ctrlDown", "5");
+        }
+        if (type == PacketType.IF_BUTTONT) {
+            params = List.of("sourceWidgetId", "sourceSlot", "sourceItemId", "destinationWidgetId",
+                    "destinationSlot", "destinationItemId");
+        }
+        if (type == PacketType.OPLOCT) {
+            params = List.of("objectId", "worldPointX", "worldPointY", "slot", "itemId", "widgetId",
+                    "ctrlDown");
+        }
+        if (type == PacketType.OPPLAYERT) {
+            params = List.of("playerIndex", "itemId", "slot", "widgetId", "ctrlDown");
+        }
+        if (type == PacketType.OPNPCT) {
+            params = List.of("npcIndex", "itemId", "slot", "widgetId", "ctrlDown");
+        }
+        return params;
     }
 
     public static void addNode(Object packetWriter, Object packetBufferNode) {
